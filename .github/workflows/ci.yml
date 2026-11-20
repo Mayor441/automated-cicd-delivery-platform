@@ -37,7 +37,7 @@ jobs:
           java-version: '17'
           distribution: temurin
 
-            - name: Build and test with Maven
+      - name: Build and test with Maven
         working-directory: springboot-app
         env:
           DB_PASSWORD: root
