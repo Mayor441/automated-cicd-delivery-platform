@@ -103,3 +103,55 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+  
+
+  deploy:
+    name: Deploy to Windows Self-Hosted Runner
+    runs-on: [self-hosted, Windows, X64]
+    needs: docker-publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Pull latest repository changes
+        shell: powershell
+        run: |
+          git -C E:\CI-CD-Delivery-Platform pull --ff-only origin main
+
+      - name: Pull latest Docker image
+        shell: powershell
+        working-directory: E:\CI-CD-Delivery-Platform
+        run: |
+          docker compose pull app
+
+      - name: Deploy application
+        shell: powershell
+        working-directory: E:\CI-CD-Delivery-Platform
+        run: |
+          docker compose up -d --no-build app
+
+      - name: Verify application health
+        shell: powershell
+        run: |
+          $url = "http://localhost:8080/api/employees"
+          $healthy = $false
+
+          for ($i = 1; $i -le 12; $i++) {
+            try {
+              $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
+              if ($response.StatusCode -eq 200) {
+                $healthy = $true
+                break
+              }
+            }
+            catch {
+              Start-Sleep -Seconds 5
+            }
+          }
+
+          if (-not $healthy) {
+            docker logs employee-app --tail 100
+            throw "Application health check failed"
+          }
+
+          Write-Host "Deployment successful. Application is responding."
+
